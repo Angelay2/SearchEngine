@@ -1,6 +1,7 @@
 // 这个的代码用于实现直接预处理模块
 // 核心功能就是读取并分析boost文档的_html
-// 
+// 解析出每个文档的标题、url、正文（去除html标签）
+// 最终把结果输出成一个行文本文件
 #include <iostream>
 #include <fstream>
 #include <string>
@@ -8,20 +9,23 @@
 #include <vector>
 
 #include<boost/filesystem/operations.hpp>
-#include <boost/fileatem/path.deep>
+#include <boost/fileatem/path.hpp>
 #include "../common/util.hpp>"
 
 using std::cout;
 using std::endl;
+using std::string;
 using std::unordered_map;
 using std::vector;
+
+// 定义一些相关的变量和结构体
 
 // 这个变量表示从哪个目录当中读取 boost 文档的 html
 string g_input_path = "../data/input";
 // 这个变量对应预处理模块输出结果放到哪里
 string g_output_path = "../data/tmp/raw_input";
 
-// 创建爱你一个重要的结构体, 表示一个文档(一个HTML) 
+// 创建一个重要的结构体, 表示一个文档(一个HTML) 
 struct DocInfo{
    // 文档的标题
    string title;
@@ -31,9 +35,14 @@ struct DocInfo{
    string content;
 };
 
-bool Enumfile(const string &input_path, vector<int> *iter){
+// 一个函数的输入参数，用 const & 来表示
+// 一个函数的输出参数，使用指针来表示
+// 一个函数的输入输出参数， 使用引用来表示
+bool Enumfile(const string &input_path, vector<string> *file_list){
 // 预处理过程的核心流程
 // 1. 把 input 目录中所有的 html 路径都枚举出来
+// 枚举目录需要使用 boost 来完成
+// 把 boost::filesystem 这个命名空间定义一个别名
     namespace fs = boost::filesystem;
     fs::path root_path(input_path);
     if(!fs::exits(root_path)){
@@ -41,23 +50,51 @@ bool Enumfile(const string &input_path, vector<int> *iter){
         return false;
     }
     // 递归遍历的时候使用到一个核心的类
-    // 迭代器使用循环实现的时候可以在完全递归
+    // 迭代器使用循环实现的时候可以自动完成递归
     // C++ 常用的一种做法, 把迭代器的默认构造函数生成的迭代器作为一个"哨兵"
     fs::recursive_directory_iterator end_iter;
     for(fs::recursive_directory_iterator iter(root_path); iter != end_iter; ++iter){
-        // 当前的路径对于的是不是一个普通文件, 如果是目录,直接跳过
+        // 当前的路径对应的是不是一个普通文件, 如果是目录,直接跳过
         if(!fs::is_regular_file(*iter)){
             continue;
         }       
-        // 当前路径对于的文件是不是一个Html文件, 如果是其他文件也跳过
-        if(!iter->path().extension() != ".html"){
+        // 当前路径对于的文件是不是一个Html文件, 如果是，其他文件也跳过
+        if(iter->path().extension() != ".html"){
             continue;
         }
         // 把得到的路径加入到最终结果的vector中
         file_list->push_back(iter->path.string());
     }
+    return true;
 }
 
+// 找到 html 中的title标签
+bool ParserTitle(const string &html, string* title){
+    size_t beg = html.find("<title>");
+    if(beg == string::npos){
+        std::cout << "标题未找到" << std::endl;
+        return false;
+    }
+    size_t end = html.find("</title");
+    if(end == string::npos){
+        std::cout << "标题未找到" << std::endl;
+        return false;
+    }
+    beg += string("<title>").size();
+    if(beg >= end){
+        std::cout << "标题位置不合法" << std::endl;
+        return false;
+    }
+    *title = html.substr(beg, end - beg);
+    return true;
+}
+
+// 根据本地路径获取到在线文档的路径
+// 本地路径形如：
+// ../data/input/html/thread.html
+// 在线路径形如：
+// https://www.boost.org/doc/libs/1_53_0/doc/html/thread.html
+// 把本地路径的后半部分截取出来，再拼装上在线路径的前缀就可以了
 bool ParserFile(const string& file_path, DocInfo* doc_info){
     // 先读取文件的内容
     //  一股脑的吧整个文件内容都读取出来
@@ -65,10 +102,7 @@ bool ParserFile(const string& file_path, DocInfo* doc_info){
     string html;
     bool ret = Read(file_path, &html);
 }
-bool ParserTitle(const string& html, string* title){
 
-
-}
 // 根据本地路径来获取到在线文档的路径
 // 本地路径形如: ../data/input/html/
 // 在线路径如: https://www.boost.org/doc.libs.
