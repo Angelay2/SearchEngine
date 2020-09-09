@@ -89,42 +89,35 @@ bool ParserTitle(const string &html, string* title){
     return true;
 }
 
-// 根据本地路径获取到在线文档的路径
-// 本地路径形如：
-// ../data/input/html/thread.html
-// 在线路径形如：
-// https://www.boost.org/doc/libs/1_53_0/doc/html/thread.html
-// 把本地路径的后半部分截取出来，再拼装上在线路径的前缀就可以了
-bool ParserFile(const string& file_path, DocInfo* doc_info){
-    // 先读取文件的内容
-    //  一股脑的吧整个文件内容都读取出来
-    //  Read 这样的函数是一个比较底层比较通用的函数, 各个模块都可以用到
-    string html;
-    bool ret = Read(file_path, &html);
-}
 
 // 根据本地路径来获取到在线文档的路径
 // 本地路径形如: ../data/input/html/
-// 在线路径如: https://www.boost.org/doc.libs.
-bool ParserUrl(const string& file_path, string* url){
-   string url_head = ; 
-   string url_tail = ;
+// 在线路径如: https://www.boost.org/doc.libs/1_53_0/doc/html/thread.html
+// 把本路径的后半部分截取出来，再拼装上在线路径的前缀就可以了
+bool ParserUrl(const string &file_path, string* url){
+   string url_head = "https://www.boost.org/doc/libs/1_53_0/doc/"; 
+   string url_tail = file_path.substr(g_input_path.size());
    *url = url_head + url_tail;
     return true;
 }
 
+// 针对读取出来的 html 内容进行去标签
 bool ParserContent(const string& html, string* content){
   bool id_content = true;
   for(auto c : html){
       if(is_content){
+          // 当前已经是正文了
           if(c == '<'){
-              // 说明当前遇到了标签, 
+              // 说明当前遇到了标签 
               is_content = false;
           }
           else{
               // 这里还要单独处理下'\n', 预期的输出结果是一个行文本文件
-              // 最终结果raw_input中每一行对应到一个原始的HTML文档
+              // 最终结果 raw_input 中每一行对应到一个原始的HTML文档
               // 此时就需要把html文档中原来的\n都干掉
+              if(c == '\n'){
+                  c = ' ';
+              }
               // 当前是普通字符, 就把结果写入到content中
               content->push_back(c);
           }   
@@ -138,6 +131,39 @@ bool ParserContent(const string& html, string* content){
           // 标签里的其他内容都直接忽略掉
       }
   }
+  return true;
+}
+
+bool ParserFile(const string& file_path, DocInfo* doc_info){
+    // 1. 先读取文件的内容
+    //  一股脑的吧整个文件内容都读取出来
+    //  Read 这样的函数是一个比较底层比较通用的函数, 各个模块都可能会用到
+    //  直接把这个函数就放到 common 目录即可
+    string html;
+    bool ret = Read(file_path, &html);
+    if(!ret){
+        std::cout << "解析文件失败！ 读取文件失败！" << file_path << std::endl;
+        return false;
+    }
+    // 2. 根据文件内容解析处标题，（html 中有一个 title 标签）
+    ret = ParserTitle(html, &doc_info->title);
+    if(!ret){
+        std::cout << " 解析标题失败！" << std::endl;
+        return false;
+    }
+    // 3. 根据文件的路径，构造处对应的在线文档的 url
+    ret = ParserUrl(file_path, &doc_info->url);
+    if(!ret){
+        std::cout << "解析 url 失败！" << std::endl;
+        return false;
+    }
+    // 4. 根据文件内容，进行去标签， 作为 doc_info 中的 content 字段的内容
+    ret = ParserContent(html, &doc_info->content);
+    if(!ret){
+        std::cout << "解析正文失败！" << std::endl;
+        return false;
+    }
+    return true;
 }
 
 int main(){
