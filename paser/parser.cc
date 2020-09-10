@@ -166,18 +166,46 @@ bool ParserFile(const string& file_path, DocInfo* doc_info){
     return true;
 }
 
+// ofstream 类是没有拷贝构造函数的（不能拷贝的）
+// 按照参数传的时候， 只能传引用或者之好着呢
+// 此处还不能是 const 引用， 否则无法执行里面的写我呢间操作
+// 每个 doc_info 就是一行
+void WriteOutput(const DocInfo &doc_info, std::ofstream &ofstream){
+    ofstream << doc_info.title << "\3" << doc_info.url << "\3" << doc_info.content << std::endl;    
+}
+
+// 预处理过程的核心流程
+// 1. 把 input 目录中所有的 html 路径都枚举出来
+// 2. 根据枚举出来的路径一次读取每个文件内容，并进行解析
+// 3. 把解析结果写入到最终的输出文件中
 int main(){
     // 1. 进行枚举路径
     vector<string> file_list;
     bool ret = Enumfile(g_input_path, );
-
-
+    if(!ret){
+        std::cout << "枚举路径失败！" << std::endl;
+        return 1;
+    }
     // 2. 遍历枚举出来的路径, 针对每个文件 ,单独进行处理
     std::ofstream output_file(g_output_path.c_str());
-    if(!output_file){
-        std::cout << file_path << std::endl;
-
+    if(!output_file.is_open()){
+        std::cout << "打开 output 文件失败！"<< std::endl;
+        return 1;
     }
+    for(const auto &file_path : file_list){
+        std::cout << file_path << std::endl;
+        // 先创建一个 DocInfo 对象
+        DocInfo doc_info;
+        // 通过一个函数来负责这里的解析工作
+        ret = ParseFile(file_path, &doc_info);
+        if(!ret){
+            std::cout << "解析该文件失败：" << file_path << std::endl;
+            continue;
+        }
+        // 3.把解析出来的结果写入到最终的输出文件中
+        WriteOutput(doc_info, output_file);
+    }
+    output_file.close();
     return 0;
 }
 
