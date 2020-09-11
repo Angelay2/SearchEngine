@@ -1,6 +1,19 @@
 #include "search.h"
+#include "../common/util.hpp"
+#include <boost/algorithm/string/case_conv.hpp>
+#include <fstream>
+#include <string>
 
 namespace searcher{
+
+const char* const DICT_PATH = "../jieba_dict.utf8";
+const char* const HMM_PATH = "../jiaba_dict/hmm_model.utf8";
+const char* const USER_DICT_PATH = "../jieba_dict/idf.utf8";
+const char* const IDF_PATH = "../jieba_dict/idf.utf8";
+const char* const STOP_WORD_PATH = "../jieba_dict/stop_words.utf8";
+
+Index::Index()
+    :jieba(DICT_PATH, HMM_PATH, USER_DICT_PATH, IDF_PATH, STOP_WORD_PATH){}
     const DocInfo*Index::GetDocInfo(int64_t doc_id){
         if(doc_id < 0 || doc_id >= forword_index.size()){
             return nullptr;
@@ -8,14 +21,14 @@ namespace searcher{
         return &forword_index[doc_id];
     }
     const InvertedList* Index::GetInvertedList(const string &key){
-        unordered_map<string, InvertedList>::iterator it = inverted_index.find(key);
+        //unordered_map<string, InvertedList>::iterator it = inverted_index.find(key);
         auto it = inverted_index.find(key);
         if(it == inverted_index.end()){
             return nullptr;
         }
-        return it->second;
+        return &it->second;
     }
-    // 上面的两个函数实现起来都比价哦容易, 接下来的这个个函数(构建索引),实现起来就要更复杂
+    // 上面的两个函数实现起来都比较容易, 接下来的这个函数(构建索引),实现起来就要更复杂
     bool Index::Build(const string& input_path){
         // 1. 按行读取输入文件内容(上个环节预处理模块生产的raw_input文件)
         //  raw_input 的结构: 是一个行文本文件, 每一行对应一个问的那个
