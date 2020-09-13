@@ -92,20 +92,62 @@ void Index::BuildInverted(const DocInfo &doc_info){
         int content_cnt;
         WordCnt():title_cnt(0), content_cnt(0){}
     };
+    unordered_map<string, WordCnt> word_cnt_map;
+    // 1. 针对标题进行分词
+    vector<string> title_token;
+    CutWord(doc_info.title, &title_token);
+    // 2. 遍历分词结果， 统计每个词出现的次数
+    for(string word:title_token){
+        // map/unordered_map[] 有两个功能，key 不存在就添加， 存在就修改
+        // 注意， 次数需要考虑 大小写的问题
+        // 针对 HELLO，hello, Hello, 算成三个单词各自出现一次
+        // 还是单词出现三次[合理做法]
+        // 在统计之前先把单词统一转成全小写
+        // C++标准库中没有转小写的操作，使用 boost 来完成
+        // to_lower 会直接修改当前单词， 而 word 现在是一个 const 引用
+        boost::to_lower(word);
+        ++word_cnt_map[word].titke_cnt;
+    }
+    // 3. 针对正文进行分词
+    vector<string> content_token;
+    CutWord(doc_info.content, &content_token);
+    // 4. 遍历分词结果，统计每个词出现的次数
+    for(string word:content_token){
+        boost::to_lower(word);
+        ++word_cnt_map[word].content_cnt;
+    }
+    // 5. 根据统计结果， 整个出 Weight 对象， 并把结果更新到 倒排索引 中即可
+    // word_pair 每次循环就是对应到 map 中的一个键值对(std::pair)
+    for(const auto& word_pair:word_cnt_map){
+        // 构造 Weight 对象
+        Weight weight;
+        weight.doc_id = doc_info.doc_id;
+        // 权重 = 标题出现次数 * 10 + 正文出现次数
+        weight.wieght = 10 * word_pair.second.title_cnt + word_pair.second.content_cnt;
+        weight.word = word_pair.first;
+        // 把 weight 对象插入到倒排索引中， 需要先找到对应的倒排拉链
+        // 然后追加到拉链末尾即可
+        InvertedList &inverted_list = inverted_index[word_pair.first];
+        Inverted_list.push_back(std::move(weight));
+    }
+}
+
+void Index::CutWord(const string& input, vector<string>* output){
+    jieba.CutForSearch(input, *output);
 }
     // 内存泄漏会导致一个进程持有的内存持续增长,(如果增长一定程度, 不再增长 也就不会产生内存泄漏)
-    class Searcher{ // 和Index 的生命周期很长 跟随整个进程 不需要delete, 这两个对象不会被重复实例化多次
-        private:
-            // 搜索过程依赖索引, 就需要在Searcher类中有一个 Index 的指针
-            Index* index;
-        public:
-            Searcher() : index(new Index()){
+    //class Searcher{ // 和Index 的生命周期很长 跟随整个进程 不需要delete, 这两个对象不会被重复实例化多次
+    //    private:
+    //        // 搜索过程依赖索引, 就需要在Searcher类中有一个 Index 的指针
+    //        Index* index;
+    //    public:
+    //        Searcher() : index(new Index()){
 
-            }
-            bool Init(const string& input_path);
-            bool Search(const string& query, string* results);
+    //        }
+    //        bool Init(const string& input_path);
+    //        bool Search(const string& query, string* results);
 
-    };
+    //};
 
 
 }// namespace searcher
